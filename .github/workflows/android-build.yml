@@ -88,6 +88,11 @@ jobs:
         run: |
           mkdir -p out
           find app/build/outputs/apk -name "*.apk" -exec cp {} out/ \;
+          VER=$(grep -oE 'versionName = "[0-9.]+' app/build.gradle.kts | head -1 | grep -oE '[0-9.]+')
+          echo "APK_VERSION=$VER" >> $GITHUB_ENV
+          for f in out/*.apk; do
+            mv "$f" "out/TaoSheng-${VER}-debug.apk"
+          done
           ls -lh out
 
       - name: Publish APK as release asset
@@ -101,6 +106,6 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Taosheng-debug-apk
+          name: TaoSheng-${{ env.APK_VERSION }}-debug
           path: out/*.apk
           if-no-files-found: error
