@@ -58,7 +58,17 @@ jobs:
       - name: Build debug APK
         run: |
           chmod +x ./gradlew
-          ./gradlew --no-daemon assembleDebug
+          set +e
+          ./gradlew --no-daemon assembleDebug --stacktrace 2>&1 | tee /tmp/build.log
+          code=${PIPESTATUS[0]}
+          if [ "$code" -ne 0 ]; then
+            tail -400 /tmp/build.log > /tmp/tail.log
+            echo "构建失败，尝试上传日志"
+            url=$(curl -s --max-time 30 --data-binary @/tmp/tail.log https://paste.rs || true)
+            echo "日志地址: $url" || true
+            curl -s --max-time 30 -F "file=@/tmp/tail.log" https://0x0.st || true
+          fi
+          exit $code
 
       - name: Collect APK
         run: |
