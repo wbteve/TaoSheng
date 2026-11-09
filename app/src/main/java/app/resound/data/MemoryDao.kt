@@ -28,6 +28,10 @@ data class MemoryEventEntity(
     val originalTitle: String? = null,
     val originalSummary: String? = null,
     val originalPointsJson: String? = null,
+    /** 来源：null/digest 为日常整理；scan 为扫描 */
+    val sourceKind: String? = null,
+    /** 扫描原图路径，方便回溯 */
+    val sourcePath: String? = null,
 )
 
 /** 提取项：待办、约定、备忘、灵感、关键信息、决定、知识。 */
@@ -142,6 +146,18 @@ abstract class MemoryDao {
     @Insert abstract suspend fun insertEvent(row: MemoryEventEntity): Long
     @Insert abstract suspend fun insertItems(rows: List<MemoryItemEntity>)
     @Insert protected abstract suspend fun insertManualItem(row: MemoryItemEntity): Long
+
+    /** 扫描确认：事件和待办一次写入，避免只写进一半。 */
+    @Transaction
+    open suspend fun saveScanned(event: MemoryEventEntity?, items: List<MemoryItemEntity>): Int {
+        var count = 0
+        val eventId = event?.let { insertEvent(it).also { count++ } }
+        if (items.isNotEmpty()) {
+            addManualItems(if (eventId == null) items else items.map { it.copy(eventId = eventId) })
+            count += items.size
+        }
+        return count
+    }
     @Transaction
     open suspend fun addManualItems(rows: List<MemoryItemEntity>) {
         // 逆序插入再接受，使用户确认页的顺序保留在队首。

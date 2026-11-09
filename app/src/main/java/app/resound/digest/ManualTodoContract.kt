@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.StateFlow
  *
  * 待办页右下角按钮：点一下打字，按住说话。两种都把文字交给整理模型拆成待办卡，用户改好、确认后直接进“进行中”。
  */
-enum class ItemOrigin { Digest, Typed, Voice }
+enum class ItemOrigin { Digest, Typed, Voice, Scan }
 
 /** 一张待确认的待办卡（还没入库）；字段含义同 [MemoryItem] */
 data class TodoDraft(

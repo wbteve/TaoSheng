@@ -2,6 +2,7 @@ package app.resound
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
@@ -56,6 +57,10 @@ import app.resound.ui.transcript.TranscriptScreen
 import app.resound.ui.verify.VerifyScreen
 
 class MainActivity : ComponentActivity() {
+    /** Android 13+ 通知权限：首次启动主动申请一次，用户拒绝后可在设置→推送通道里重试。 */
+    private val notificationPermission = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { }
+
     /** 点“今日回顾”通知进来：要打开的那天，和对底栏的切页请求 */
     private var openReview by mutableStateOf<LocalDate?>(null)
     /** 只跳到那一天，不弹回顾（技能生成通知用） */
@@ -105,6 +110,12 @@ class MainActivity : ComponentActivity() {
         handleIntent(intent)
         enableEdgeToEdge()
         val prefs = getSharedPreferences("ui", MODE_PRIVATE)
+        if (Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED &&
+            !prefs.getBoolean("notificationAsked", false)) {
+            prefs.edit().putBoolean("notificationAsked", true).apply()
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
         // 底层未装配时（开发界面阶段）用假数据
         val capture = if (AppGraph.isReady) AppGraph.capture else FakeCaptureController()
         val stats = if (AppGraph.isReady) AppGraph.stats else FakeStatsRepository()

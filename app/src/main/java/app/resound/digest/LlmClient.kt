@@ -64,6 +64,37 @@ class LlmClient(
         } } catch (e: IOException) { throw LlmException(LlmError.Network, detail = app.resound.transcribe.modelServiceError(preset.baseUrl, e, LlmError.Network.human)) }
     }
 
+    /**
+     * 视觉识别：OpenAI 兼容的 image_url 数组内容。不强制 response_format，
+     * 因为部分视觉模型不支持 json_object；由提示词要求 JSON，调用方再解析。
+     */
+    suspend fun chatVisionJson(preset: LlmPreset, key: String, system: String, user: String, imageDataUrl: String): LlmReply = withContext(Dispatchers.IO) {
+        val content = JSONArray()
+            .put(JSONObject().put("type", "text").put("text", user))
+            .put(JSONObject().put("type", "image_url").put("image_url", JSONObject().put("url", imageDataUrl)))
+        val body = JSONObject()
+            .put("model", preset.model)
+            .put("messages", JSONArray()
+                .put(JSONObject().put("role", "system").put("content", system))
+                .put(JSONObject().put("role", "user").put("content", content)))
+            .put("temperature", 0.1).put("max_tokens", MAX_JSON_OUTPUT_TOKENS)
+        applyLlmOptions(preset, body, thinking = false)
+        val request = Request.Builder()
+            .url(preset.baseUrl.trimEnd('/') + "/chat/completions")
+            .apply { if (key.isNotBlank()) header("Authorization", "Bearer $key") }
+            .post(body.toString().toRequestBody("application/json".toMediaType()))
+            .build()
+        try { clientFor(preset).newCall(request).consumeResponse {
+            val raw = it.body?.string().orEmpty()
+            val json = runCatching { JSONObject(raw) }.getOrNull()
+            val usage = json?.optJSONObject("usage")?.let { u -> LlmReply("", u.optLong("prompt_tokens"), u.optLong("completion_tokens")) }
+            if (it.code !in 200..299) throw httpError(it.code, usage)
+            val contentText = json?.optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message")?.optString("content")
+                ?: throw LlmException(LlmError.Format, usage = usage)
+            LlmReply(contentText, usage?.promptTokens ?: 0, usage?.completionTokens ?: 0)
+        } } catch (e: IOException) { throw LlmException(LlmError.Network, detail = app.resound.transcribe.modelServiceError(preset.baseUrl, e, LlmError.Network.human)) }
+    }
+
     /** 读取响应体期间取消协程会立即 cancel HTTP call，而不只是取消等待响应头。 */
     suspend fun streamChat(
         preset: LlmPreset, key: String, messages: JSONArray, tools: JSONArray,

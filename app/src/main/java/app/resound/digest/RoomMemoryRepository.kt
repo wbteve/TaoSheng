@@ -167,6 +167,7 @@ class RoomMemoryRepository(
         items.map { it.toModel(repeats[it.id] ?: 1, lines) }, starred, starredAt, editedAt,
         if (originalTitle != null && originalSummary != null && originalPointsJson != null)
             EventOriginal(originalTitle, originalSummary, originalPointsJson.strings()) else null,
+        sourceKind, sourcePath,
     )
 
     private fun MemoryItemEntity.toModel(repeats: Int = 1, lines: Map<Long, app.resound.data.TranscriptLineEntity>) = MemoryItem(

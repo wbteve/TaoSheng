@@ -129,7 +129,7 @@ class RoomAskRepository(
         var proposal: ProposedChange? = null
         var accepting = true
         try {
-            if (!hasKey()) current = current.copy(error = "还没填写大模型密钥")
+            if (!hasKey()) current = current.copy(error = "还没填写大模型密钥。请到设置 → 整理模型填写后再问")
             else withTimeout(timeoutMs) {
                 val context = if (source != null) contextReader?.read(source) else contextReader?.followUp(history)
                 engine().answer(system(), history, user.text, context) { update ->
@@ -147,9 +147,15 @@ class RoomAskRepository(
         } catch (e: CancellationException) {
             synchronized(lock) { if (current.text.isEmpty()) current = current.copy(text = "已停止") }
         } catch (e: LlmException) {
-            synchronized(lock) { current = current.copy(error = e.detail) }
+            val message = when (e.type) {
+                app.resound.digest.LlmError.Auth -> "大模型密钥无效或没开通，请到设置 → 整理模型检查"
+                app.resound.digest.LlmError.Network -> "${e.detail}。请检查网络后重试"
+                app.resound.digest.LlmError.RateLimit -> "请求太频繁，请稍后重试"
+                else -> e.detail
+            }
+            synchronized(lock) { current = current.copy(error = message) }
         } catch (_: Exception) {
-            synchronized(lock) { current = current.copy(error = "查询失败，请重试") }
+            synchronized(lock) { current = current.copy(error = "查询失败，请检查网络后重试") }
         } finally {
             val final = synchronized(lock) {
                 accepting = false

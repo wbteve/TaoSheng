@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import androidx.work.*
+import app.resound.AppGraph
 import app.resound.ResoundApp
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
@@ -29,6 +30,10 @@ class CaptureBootReceiver : BroadcastReceiver() {
         app.rescheduleDigest(changed = true)
         app.quietSchedule.refresh()
         CaptureService.recheck()
+        // 重启、换时区、系统改了准点闹钟权限后，AlarmManager 里的待办提醒可能已丢失；按库里的最新数据重排。
+        app.scope.launch {
+            (AppGraph.push as? app.resound.push.AndroidPushChannels)?.phoneReminders?.refresh()
+        }
         if (intent.action != Intent.ACTION_BOOT_COMPLETED && intent.action != Intent.ACTION_MY_PACKAGE_REPLACED) return
         val pending = goAsync()
         app.scope.launch {

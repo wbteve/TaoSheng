@@ -57,5 +57,10 @@ class LocalNotifier(private val context: Context, private val channel: String = 
         const val TODO_CHANNEL = "todo-reminder-2"
         const val BALANCE_CHANNEL = "llm-balance"
         const val NOTIFICATION_ID = 100
+
+        /** App 启动时把所有本地通知渠道建好，避免首次提醒时渠道还没创建或被用户误关后无声失败。 */
+        fun ensureChannels(context: Context) {
+            listOf(CHANNEL, SKILL_GENERATION_CHANNEL, TODO_CHANNEL, BALANCE_CHANNEL).forEach { LocalNotifier(context, it) }
+        }
     }
 }

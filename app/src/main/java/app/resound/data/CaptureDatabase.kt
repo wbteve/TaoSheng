@@ -76,7 +76,7 @@ abstract class CaptureDatabase : RoomDatabase() {
     abstract fun skills(): app.resound.skills.SkillDao
     companion object {
         /** 当前数据库版本；加迁移时同步改这里 */
-        const val VERSION = 29
+        const val VERSION = 30
 
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
@@ -299,7 +299,14 @@ abstract class CaptureDatabase : RoomDatabase() {
         val MIGRATION_28_29 = object : Migration(28, 29) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) = PendingDigestSchema.create(db)
         }
-        val MIGRATIONS get() = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29)
+        /** 扫描：事件记来源和原图路径 */
+        val MIGRATION_29_30 = object : Migration(29, 30) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE memory_events ADD COLUMN sourceKind TEXT")
+                db.execSQL("ALTER TABLE memory_events ADD COLUMN sourcePath TEXT")
+            }
+        }
+        val MIGRATIONS get() = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30)
         fun open(context: Context, name: String = "capture.db") = Room.databaseBuilder(context, CaptureDatabase::class.java, name)
             .addMigrations(*MIGRATIONS)
             .addCallback(app.resound.search.SearchIndex.callback).addCallback(app.resound.importer.ImportRecordSchema.callback)

@@ -33,6 +33,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import android.Manifest
+import android.app.AlarmManager
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import android.os.PowerManager
+import android.provider.Settings
+import android.widget.Toast
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,6 +69,7 @@ import app.resound.push.PushCapabilities
 import app.resound.push.PushSubscription
 import app.resound.push.PushLog
 import app.resound.push.PushTopic
+import app.resound.push.NotificationTest
 import app.resound.ui.theme.Rs
 import app.resound.ui.theme.RsType
 import app.resound.ui.verify.ActionButton
@@ -76,11 +89,77 @@ fun PushPage(repo: PushChannels, bottomPadding: Dp) {
     val logs by remember { repo.logs(30) }.collectAsState(initial = emptyList())
     var editing by remember { mutableStateOf<PushChannel?>(null) }
     var adding by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            NotificationTest.schedule(context)
+            Toast.makeText(context, "5 秒后发送测试通知", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(context, "没有通知权限，已打开系统设置", Toast.LENGTH_SHORT).show()
+            context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+    }
+    fun testNotification() {
+        val needsRuntime = Build.VERSION.SDK_INT >= 33 &&
+            context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        when {
+            needsRuntime -> permission.launch(Manifest.permission.POST_NOTIFICATIONS)
+            !NotificationTest.canPost(context) -> {
+                Toast.makeText(context, "通知被系统关闭，请先允许通知", Toast.LENGTH_SHORT).show()
+                context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                    .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
+            else -> {
+                NotificationTest.schedule(context)
+                Toast.makeText(context, "5 秒后发送测试通知", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     LazyColumn(
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = bottomPadding + 24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        item {
+            val exact = Build.VERSION.SDK_INT < 31 || context.getSystemService(AlarmManager::class.java).canScheduleExactAlarms()
+            val battery = context.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(context.packageName)
+            RsCard(padding = PaddingValues(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("测试通知", style = RsType.body.copy(fontWeight = FontWeight.Medium), color = c.text)
+                        Text(if (NotificationTest.canPost(context)) "通知权限和渠道正常；点一下 5 秒后弹一条待办提醒。" else "通知被关闭，点一下先去允许。",
+                            style = RsType.caption, color = c.textSecondary)
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    Pill("5 秒后测试", filled = true) { testNotification() }
+                }
+                if (!exact || !battery) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(buildString {
+                        if (!exact) append("准点提醒未获系统授权，可能晚几分钟")
+                        if (!exact && !battery) append("；")
+                        if (!battery) append("省电限制可能延后或拦截提醒")
+                    }, style = RsType.caption, color = c.warning)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
+                        if (!exact) Pill("允许闹钟与提醒", filled = false) {
+                            runCatching {
+                                context.startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                                    Uri.parse("package:${context.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                            }
+                        }
+                        if (!battery) Pill("允许后台运行", filled = false) {
+                            runCatching {
+                                context.startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                                    Uri.parse("package:${context.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                            }
+                        }
+                    }
+                }
+                Text("最终采用：AlarmManager 准点闹钟 + WorkManager 兜底；重启后自动重排。", style = RsType.caption, color = c.textTertiary,
+                    modifier = Modifier.padding(top = 6.dp))
+            }
+        }
         item {
             Text("手机通知照常发。加一个通道，还能把每日回顾、每天的记忆文档推到微信、飞书、钉钉、邮件；想交给你自己的智能体读，用“坚果云同步文件夹”或自定义接口。",
                 style = RsType.subhead, color = c.textSecondary, modifier = Modifier.padding(horizontal = 4.dp))

@@ -132,6 +132,9 @@ object AppGraph {
     lateinit var ask: app.resound.ask.AskRepository
     val isAskReady: Boolean get() = ::ask.isInitialized
 
+    lateinit var scan: app.resound.scan.ScanRepository
+    val isScanReady: Boolean get() = ::scan.isInitialized
+
     lateinit var voiceprint: app.resound.voiceprint.VoiceprintRepository
     val isVoiceprintReady: Boolean get() = ::voiceprint.isInitialized
 

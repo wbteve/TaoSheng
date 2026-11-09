@@ -38,7 +38,7 @@ internal class MemoryFolder(private val today: LocalDate, private val zone: Zone
     private fun time(at: Long) = outputTime.moment(at)
     private fun cn(date: LocalDate) = date.format(DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE", Locale.CHINESE))
     private fun item(i: MemoryItemEntity, snapshot: PushSnapshot): String {
-        val origin = snapshot.events.find { it.id == i.eventId }?.let { "[[${dailyPath(date(it.startAt))}#E${it.id}]]" } ?: when (i.origin) { "typed" -> "手动添加"; "voice" -> "语音添加"; else -> "" }
+        val origin = snapshot.events.find { it.id == i.eventId }?.let { "[[${dailyPath(date(it.startAt))}#E${it.id}]]" } ?: when (i.origin) { "typed" -> "手动添加"; "voice" -> "语音添加"; "scan" -> "扫描添加"; else -> "" }
         val repeat = snapshot.repeats[i.id] ?: 1
         return "- I${i.id} · ${i.category}${i.kind?.let { " / $it" }.orEmpty()} · ${i.content} · ${statusText(i.status)}" +
             (if (repeat > 1) " · 说过 $repeat 次" else "") + (i.who?.let { " · $it" } ?: "") + (i.dueAt?.let { " · 到期 ${time(it)}" } ?: i.dueText?.let { " · $it" }.orEmpty()) + " · $origin"

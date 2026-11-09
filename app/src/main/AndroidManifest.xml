@@ -50,6 +50,7 @@
         <service android:name="com.google.android.datatransport.runtime.backends.TransportBackendDiscovery" tools:node="remove" />
         <service android:name="com.google.android.datatransport.runtime.scheduling.jobscheduling.JobInfoSchedulerService" tools:node="remove" />
         <receiver android:name=".push.PhoneReminderReceiver" android:exported="false" />
+        <receiver android:name=".push.TestNotificationReceiver" android:exported="false" />
         <receiver android:name=".push.StrongReminderReceiver" android:exported="false" />
         <receiver android:name="com.google.android.datatransport.runtime.scheduling.jobscheduling.AlarmManagerSchedulerBroadcastReceiver" tools:node="remove" />
 

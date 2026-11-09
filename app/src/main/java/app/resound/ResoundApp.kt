@@ -71,6 +71,7 @@ class ResoundApp : Application() {
         AppGraph.inputs = inputs
         AppGraph.playbackSkip = AndroidPlaybackSkipSettings(this)
         CaptureNotifications.channels(this)
+        app.resound.push.LocalNotifier.ensureChannels(this)
         controller = AndroidCaptureController(this, store)
         AppGraph.capture = controller
         AppGraph.quietSchedule = quietSchedule
@@ -236,6 +237,8 @@ class ResoundApp : Application() {
         pushChannels.memoryDocument = dailyMemory::load
         reviewScheduler.schedule(reviews.state.value.dailyAtMinutes)
         AppGraph.ask = app.resound.ask.createAskRepository(this, database, llm, digestSettings, scope)
+        AppGraph.scan = app.resound.scan.AndroidScanRepository(llm, { digestSettings.skillCredentials(null) }, database.memory(),
+            onSaved = { app.resound.search.EmbeddingScheduler.enqueue(this) })
         AppGraph.transcripts = transcripts
         AppGraph.transcribeSettings = settings
         AppGraph.stats = RoomCaptureStatsRepository(this, database.capture(), transcripts::diagnostics)

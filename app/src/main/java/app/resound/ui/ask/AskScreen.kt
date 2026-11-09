@@ -116,7 +116,9 @@ fun AskScreen(repo: AskRepository, bottomPadding: Dp) {
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
                     items(messages, key = { it.id }) { m ->
-                        if (m.role == AskRole.User) UserBubble(m.text) else AnswerCard(m, onConfirm = { repo.confirmAction(m.id) }, onCancel = { repo.cancelAction(m.id) })
+                        if (m.role == AskRole.User) UserBubble(m.text) else AnswerCard(m,
+                            onConfirm = { repo.confirmAction(m.id) }, onCancel = { repo.cancelAction(m.id) },
+                            onRetry = if (m.error != null) messages.lastOrNull { it.role == AskRole.User }?.text?.let { q -> { repo.ask(q) } } else null)
                     }
                     item { Spacer(Modifier.height(1.dp)) }
                 }
@@ -153,12 +155,19 @@ private fun UserBubble(text: String) {
 }
 
 @Composable
-private fun AnswerCard(m: AskMessage, onConfirm: () -> Unit, onCancel: () -> Unit) {
+private fun AnswerCard(m: AskMessage, onConfirm: () -> Unit, onCancel: () -> Unit, onRetry: (() -> Unit)?) {
     val c = Rs.colors
     var openSource by remember(m.id) { mutableStateOf<Int?>(null) }
     RsCard(Modifier.animateContentSize(), padding = PaddingValues(horizontal = 18.dp, vertical = 16.dp)) {
         when {
-            m.error != null -> Text(m.error, style = RsType.body, color = c.critical)
+            m.error != null -> Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(m.error, style = RsType.body, color = c.critical, modifier = Modifier.weight(1f))
+                onRetry?.let {
+                    Spacer(Modifier.width(10.dp))
+                    Text("重试", style = RsType.subhead.copy(fontWeight = FontWeight.Medium), color = c.accent,
+                        modifier = Modifier.clip(CircleShape).background(c.accentSoft).springClick(it).padding(horizontal = 12.dp, vertical = 6.dp))
+                }
+            }
             m.text.isEmpty() && m.progress != null -> Progress(m.progress)
             else -> {
                 AnswerText(m.text)

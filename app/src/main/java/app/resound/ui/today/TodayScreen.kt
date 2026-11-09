@@ -164,6 +164,7 @@ fun TodayScreen(
     val cards by remember(date) { skills.cards(date) }.collectAsState(initial = emptyList())
     var openedCard by remember { mutableStateOf<app.resound.skills.SkillCard?>(null) }
     var openedImport by remember { mutableStateOf<Long?>(null) }
+    var scanOpen by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf<MemoryEvent?>(null) }
     val deleteNow = rememberDeleteEvent(memory)
     val segments by remember(date) { transcripts.day(date) }.collectAsState(initial = emptyList())
@@ -239,7 +240,7 @@ fun TodayScreen(
         // 闪退提示、上手清单和标题放在同一格：不显示时不占位，录音卡紧挨着日期
         item {
             Column {
-                Header(date, themeMode, onThemeMode)
+                Header(date, themeMode, onThemeMode, onScan = if (app.resound.AppGraph.isScanReady) { { scanOpen = true } } else null)
                 if (dayOffset == 0) {
                     app.resound.ui.settings.CrashNotice(topGap = 20.dp)
                     // 首次使用：几步设置的清单，做完或关掉就不再出现；只在看今天时显示
@@ -386,6 +387,8 @@ fun TodayScreen(
     }
 
     opened?.let { event -> EventSheet(event, memory) { opened = null } }
+    if (scanOpen && app.resound.AppGraph.isScanReady)
+        app.resound.ui.scan.ScanSheet(app.resound.AppGraph.scan) { scanOpen = false }
     openedCard?.let { card -> app.resound.ui.skills.SkillCardSheet(card, skills) { openedCard = null } }
     deleting?.let { e -> DeleteEventSheet(e, { memory.deleteEvent(e.id) }) { deleting = null } }
     openedThingRecord?.let { r -> app.resound.ui.things.ThingConfirmSheet(r, things) { openedThingRecord = null } }
@@ -398,7 +401,7 @@ fun TodayScreen(
 }
 
 @Composable
-private fun Header(date: LocalDate, themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
+private fun Header(date: LocalDate, themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit, onScan: (() -> Unit)? = null) {
     val c = Rs.colors
     val today = LocalDate.now()
     val label = when (ChronoUnit.DAYS.between(date, today)) {
@@ -412,6 +415,12 @@ private fun Header(date: LocalDate, themeMode: ThemeMode, onThemeMode: (ThemeMod
             Text("$label · ${date.format(DateTimeFormatter.ofPattern("EEEE", Locale.CHINA))}", style = RsType.subhead, color = c.textSecondary)
             Spacer(Modifier.height(2.dp))
             Text(date.format(DateTimeFormatter.ofPattern("M月d日")), style = RsType.largeTitle, color = c.text)
+        }
+        onScan?.let {
+            Text("扫描", style = RsType.subhead.copy(fontWeight = FontWeight.Medium), color = c.accent,
+                modifier = Modifier.clip(CircleShape).background(c.accentSoft).springClick(it)
+                    .padding(horizontal = 12.dp, vertical = 6.dp))
+            Spacer(Modifier.width(8.dp))
         }
         ThemeModePill(themeMode, onThemeMode)
     }
@@ -1076,6 +1085,24 @@ internal fun EventSheet(event: MemoryEvent, memory: MemoryRepository, onClose: (
             }
             Spacer(Modifier.height(12.dp))
             Text(shown.summary, style = RsType.body, color = c.text)
+            if (shown.sourceKind == "扫描") {
+                Spacer(Modifier.height(10.dp))
+                RsCard(padding = PaddingValues(14.dp), color = c.accentSoft) {
+                    Text("来源：扫描", style = RsType.caption.copy(fontWeight = FontWeight.Medium), color = c.accent)
+                    androidx.compose.foundation.text.selection.DisableSelection {
+                        Text("查看原图 ›", style = RsType.subhead.copy(fontWeight = FontWeight.Medium), color = c.accent,
+                            modifier = Modifier.padding(top = 4.dp).springClick {
+                                val path = shown.sourcePath ?: return@springClick
+                                runCatching {
+                                    val file = java.io.File(path)
+                                    val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+                                    context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW)
+                                        .setDataAndType(uri, "image/*").addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+                                }.onFailure { android.widget.Toast.makeText(context, "原图已不存在", android.widget.Toast.LENGTH_SHORT).show() }
+                            })
+                    }
+                }
+            }
             app.resound.ui.envsound.EventEnvDetail(shown, Modifier.padding(top = 14.dp))
 
             if (shown.points.isNotEmpty()) {
@@ -1292,12 +1319,16 @@ internal fun ItemSheet(opened: MemoryItem, memory: MemoryRepository, onOpenEvent
             }
             if (item.origin != app.resound.digest.ItemOrigin.Digest && item.sourceLineId == null) {
                 // 手动或语音添加的没有对应的事和原话，显示当时写的、说的那句
-                SheetSection(if (item.origin == app.resound.digest.ItemOrigin.Voice) "语音添加" else "手动添加")
+                SheetSection(when (item.origin) {
+                    app.resound.digest.ItemOrigin.Voice -> "语音添加"
+                    app.resound.digest.ItemOrigin.Scan -> "扫描添加"
+                    else -> "手动添加"
+                })
                 RsCard(padding = PaddingValues(16.dp)) {
                     Text(friendlyDate(item.at), style = RsType.caption, color = c.textTertiary)
                     item.sourceText?.let {
                         Spacer(Modifier.height(4.dp))
-                        Text("“$it”", style = RsType.body, color = c.text)
+                        Text(if (item.origin == app.resound.digest.ItemOrigin.Scan) "原图：$it" else "“$it”", style = RsType.body, color = c.text)
                     }
                 }
             } else {

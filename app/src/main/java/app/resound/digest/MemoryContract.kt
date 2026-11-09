@@ -112,6 +112,10 @@ data class MemoryEvent(
     val editedAt: Long? = null,
     /** 卡 062：编辑前整理出的原样；没编辑为 null。用于“已编辑”查看和恢复原样 */
     val original: EventOriginal? = null,
+    /** 来源：null 为日常整理，扫描记录为“扫描” */
+    val sourceKind: String? = null,
+    /** 扫描原图路径；方便回溯 */
+    val sourcePath: String? = null,
 )
 
 /** 卡 062：事件整理时的原样 */
