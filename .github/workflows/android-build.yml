@@ -90,6 +90,14 @@ jobs:
           find app/build/outputs/apk -name "*.apk" -exec cp {} out/ \;
           ls -lh out
 
+      - name: Publish APK as release asset
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="ci-${{ github.run_number }}"
+          gh release create "$TAG" out/*.apk             --title "CI build ${{ github.run_number }}"             --notes "自动构建的 debug 安装包，commit ${{ github.sha }}"             || gh release upload "$TAG" out/*.apk --clobber
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
