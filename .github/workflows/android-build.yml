@@ -1,5 +1,8 @@
 name: Build APK
 
+permissions:
+  contents: write
+
 on:
   push:
     branches: [main]
@@ -69,6 +72,17 @@ jobs:
             curl -s --max-time 30 -F "file=@/tmp/tail.log" https://0x0.st || true
           fi
           exit $code
+
+      - name: Publish failure log
+        if: failure()
+        run: |
+          tail -500 /tmp/build.log > ci-failure.log 2>/dev/null || echo "no log" > ci-failure.log
+          git config user.name "ci-bot"
+          git config user.email "ci-bot@users.noreply.github.com"
+          git checkout -B ci-log
+          git add -f ci-failure.log
+          git commit -m "ci: 失败日志 $(date -u +%Y%m%dT%H%M%SZ)" || true
+          git push -f origin ci-log || true
 
       - name: Collect APK
         run: |
